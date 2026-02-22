@@ -164,6 +164,418 @@
     </div>
 </section>
 
+<!-- First Principles & Primitives -->
+<section class="px-6 py-20 max-w-5xl mx-auto">
+    <h2 class="text-3xl font-bold text-white mb-4">First Principles & Primitives</h2>
+    <p class="text-gray-400 mb-12 max-w-3xl">
+        Hive is built on a small set of composable primitives. Each one solves a specific problem in retrieval quality — and together they form a system where an AI agent can self-improve without human intervention. These aren't abstract ideas; each primitive maps to concrete code and measurable behavior.
+    </p>
+
+    <!-- Primitive 1: Everything is a file -->
+    <div class="mb-10">
+        <div class="flex items-start gap-4 mb-4">
+            <span class="flex-shrink-0 w-10 h-10 rounded-full bg-blue-900/50 flex items-center justify-center text-blue-400 font-bold text-sm mt-1">1</span>
+            <div>
+                <h3 class="text-xl font-semibold text-white mb-1">Everything Is a File</h3>
+                <p class="text-gray-400 text-sm">The agent's interface is a directory of JSON files — no custom protocols, no APIs to learn.</p>
+            </div>
+        </div>
+        <div class="bg-card border border-border rounded-lg p-6 ml-14">
+            <p class="text-sm text-gray-400 mb-4">
+                This is the key Hornet insight: <strong class="text-gray-200">align retrieval configuration with how coding agents already work.</strong> An agent that can edit <code class="text-blue-400">tsconfig.json</code> can edit a Hive config. No new abstractions. The entire workspace is files on disk — versioned, diffable, reviewable.
+            </p>
+            <div class="bg-gray-900/60 rounded-lg p-4 font-mono text-sm text-gray-400 mb-4">
+                <div>workspace/</div>
+                <div class="ml-4">collections/knowledge-base.json <span class="text-gray-600">— "what does the data look like?"</span></div>
+                <div class="ml-4">configs/v1.json <span class="text-gray-600">— "how should I search?" (the code)</span></div>
+                <div class="ml-4">configs/v2.json <span class="text-gray-600">— "improved version" (agent creates this)</span></div>
+                <div class="ml-4">configs/active.json <span class="text-gray-600">— symlink to deployed config</span></div>
+                <div class="ml-4">documents/*.md <span class="text-gray-600">— the actual content</span></div>
+                <div class="ml-4">evals/golden.json <span class="text-gray-600">— known-good query-result pairs</span></div>
+            </div>
+            <p class="text-xs text-gray-500">
+                Why this matters: LLM agents are fundamentally code-writing tools. They understand files, directories, and JSON. By making retrieval config a file, we turn search optimization into a coding task — which is exactly what these agents are good at.
+            </p>
+        </div>
+    </div>
+
+    <!-- Primitive 2: Config IS source code -->
+    <div class="mb-10">
+        <div class="flex items-start gap-4 mb-4">
+            <span class="flex-shrink-0 w-10 h-10 rounded-full bg-purple-900/50 flex items-center justify-center text-purple-400 font-bold text-sm mt-1">2</span>
+            <div>
+                <h3 class="text-xl font-semibold text-white mb-1">The Retrieval Config IS the Source Code</h3>
+                <p class="text-gray-400 text-sm">A config file is the "program" that tells Hive how to search. It's the thing the agent iterates on.</p>
+            </div>
+        </div>
+        <div class="bg-card border border-border rounded-lg p-6 ml-14">
+            <div class="bg-gray-900/60 rounded-lg p-4 font-mono text-xs text-gray-400 mb-4 overflow-x-auto">
+                <pre>{
+  "name": "v1-naive",
+  "collection": "knowledge-base",
+  "retrieval": {
+    "method": "hybrid",   <span class="text-gray-600">// keyword | vector | hybrid</span>
+    "top_k": 10,
+    "rrf_k": 60           <span class="text-gray-600">// RRF constant (see Primitive 6)</span>
+  },
+  "dynamic_k": {
+    "enabled": false,
+    "gap_threshold_factor": 3.0,  <span class="text-gray-600">// cliff detection sensitivity</span>
+    "min_results": 1,
+    "max_results": 10
+  },
+  "filters": {},           <span class="text-gray-600">// category pre-filtering</span>
+  "distraction_detection": {
+    "enabled": false,
+    "disagreement_threshold": 0.5
+  }
+}</pre>
+            </div>
+            <div class="space-y-2 text-sm text-gray-400">
+                <p><strong class="text-gray-300">Key design choices in this config:</strong></p>
+                <ul class="list-disc ml-5 space-y-1 text-xs">
+                    <li><strong class="text-gray-300">RRF instead of weighted scores</strong> — scale-invariant, no normalization needed</li>
+                    <li><strong class="text-gray-300">gap_threshold_factor</strong> — gap-based cliff detection that works with RRF's compressed score range</li>
+                    <li><strong class="text-gray-300">distraction_detection requires method: hybrid</strong> — needs both BM25 and vector ranks to compute disagreement</li>
+                    <li><strong class="text-gray-300">filters</strong> — pre-filter by category BEFORE scoring, not after (eliminates distractors before they enter the ranking)</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Primitive 3: Collection schema -->
+    <div class="mb-10">
+        <div class="flex items-start gap-4 mb-4">
+            <span class="flex-shrink-0 w-10 h-10 rounded-full bg-teal-900/50 flex items-center justify-center text-teal-400 font-bold text-sm mt-1">3</span>
+            <div>
+                <h3 class="text-xl font-semibold text-white mb-1">Collection Schema Defines Filterable Fields</h3>
+                <p class="text-gray-400 text-sm">The agent discovers what data looks like by reading the schema — then uses that knowledge to build better configs.</p>
+            </div>
+        </div>
+        <div class="bg-card border border-border rounded-lg p-6 ml-14">
+            <p class="text-sm text-gray-400 mb-4">
+                Fields marked <code class="text-teal-400">filterable: true</code> can be used in config filters. Filters are applied as a WHERE clause <strong class="text-gray-200">before</strong> scoring (pre-filter), not after. This means distractors in excluded categories never even enter the ranking pipeline.
+            </p>
+            <div class="bg-gray-900/60 rounded-lg p-4 font-mono text-xs text-gray-400 mb-4 overflow-x-auto">
+                <pre>{
+  "name": "knowledge-base",
+  "fields": {
+    "title":    { "type": "text" },
+    "category": { "type": "keyword", "filterable": true },
+    "content":  { "type": "text" }
+  },
+  "chunking": {
+    "strategy": "by_heading",
+    "max_tokens": 512,
+    "heading_level": 2
+  }
+}</pre>
+            </div>
+            <p class="text-xs text-gray-500">
+                The agent can read this file to discover: "category is filterable, and the available values are api-docs, tutorials, faqs, changelogs." Then it can write a config with <code class="text-teal-400">"filters": {"category": ["api-docs", "tutorials"]}</code> to exclude FAQ distractors entirely.
+            </p>
+        </div>
+    </div>
+
+    <!-- Primitive 4: Verifiable APIs / Three-level validation -->
+    <div class="mb-10">
+        <div class="flex items-start gap-4 mb-4">
+            <span class="flex-shrink-0 w-10 h-10 rounded-full bg-green-900/50 flex items-center justify-center text-green-400 font-bold text-sm mt-1">4</span>
+            <div>
+                <h3 class="text-xl font-semibold text-white mb-1">Verifiable APIs: Three-Level Validation as a Compiler</h3>
+                <p class="text-gray-400 text-sm">Every config change goes through syntactic, semantic, and behavioral verification — like compiling, linting, and running tests.</p>
+            </div>
+        </div>
+        <div class="bg-card border border-border rounded-lg p-6 ml-14">
+            <p class="text-sm text-gray-400 mb-5">
+                This is the <strong class="text-gray-200">Verifiable APIs</strong> principle from Hornet: the system's interface should be checkable at multiple levels before anything gets deployed. The agent gets immediate, actionable feedback — not vague errors, but specific "here's what's wrong and how to fix it" messages.
+            </p>
+            <div class="space-y-3 mb-4">
+                <div class="bg-blue-900/20 border border-blue-900/30 rounded-lg px-4 py-3">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-blue-400 font-semibold text-sm">Level 1: Syntactic</span>
+                        <span class="text-xs text-gray-600 ml-auto">Like a compiler</span>
+                    </div>
+                    <p class="text-xs text-gray-400 mb-2">"Does the config parse correctly?"</p>
+                    <div class="bg-gray-900/50 rounded px-3 py-2 text-xs font-mono text-gray-500">
+                        Is top_k a positive integer? Is method one of keyword|vector|hybrid? Are all required fields present?
+                    </div>
+                </div>
+                <div class="bg-purple-900/20 border border-purple-900/30 rounded-lg px-4 py-3">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-purple-400 font-semibold text-sm">Level 2: Semantic</span>
+                        <span class="text-xs text-gray-600 ml-auto">Like a linter</span>
+                    </div>
+                    <p class="text-xs text-gray-400 mb-2">"Do the settings make logical sense together?"</p>
+                    <div class="bg-red-900/20 border border-red-900/30 rounded px-3 py-2 text-xs font-mono text-red-400">
+                        ✗ distraction_detection.enabled is true but method is "keyword".<br>
+                        &nbsp;&nbsp;Distraction detection requires hybrid to compare keyword vs vector rankings.<br>
+                        &nbsp;&nbsp;→ Set method to "hybrid" or disable distraction detection.
+                    </div>
+                </div>
+                <div class="bg-green-900/20 border border-green-900/30 rounded-lg px-4 py-3">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-green-400 font-semibold text-sm">Level 3: Behavioral (Deploy Gate)</span>
+                        <span class="text-xs text-gray-600 ml-auto">Like a test suite</span>
+                    </div>
+                    <p class="text-xs text-gray-400 mb-2">"Does it actually perform better than what's deployed?"</p>
+                    <div class="bg-red-900/20 border border-red-900/30 rounded px-3 py-2 text-xs font-mono text-red-400">
+                        Deploy BLOCKED: nUDCG regression 0.61 → 0.34. The system refuses to make things worse.<br>
+                        Run <code>hive compare</code> to see what changed.
+                    </div>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500">
+                The behavioral gate is the critical innovation: even if a config passes syntactic and semantic checks, it must <strong class="text-gray-400">prove it's better</strong> by running against the golden evaluation set. This prevents an agent from "improving" a config that actually makes retrieval worse.
+            </p>
+        </div>
+    </div>
+
+    <!-- Primitive 5: Dynamic-k -->
+    <div class="mb-10">
+        <div class="flex items-start gap-4 mb-4">
+            <span class="flex-shrink-0 w-10 h-10 rounded-full bg-amber-900/50 flex items-center justify-center text-amber-400 font-bold text-sm mt-1">5</span>
+            <div>
+                <h3 class="text-xl font-semibold text-white mb-1">Dynamic-k: Gap-Based Cutoff</h3>
+                <p class="text-gray-400 text-sm">Instead of always returning top_k results, stop when there's a quality cliff — "retrieve less, retrieve better."</p>
+            </div>
+        </div>
+        <div class="bg-card border border-border rounded-lg p-6 ml-14">
+            <p class="text-sm text-gray-400 mb-4">
+                Traditional retrieval always returns a fixed number of results (e.g., 10). But what if only 5 are good and the rest are noise? Dynamic-k detects the "quality cliff" where results transition from strong to weak, and stops there.
+            </p>
+            <p class="text-sm text-gray-400 mb-4">
+                <strong class="text-gray-200">Why not score-ratio cutoff?</strong> RRF scores are compressed into a narrow band (all values between ~0.018 and ~0.033 for k=60). A result at BM25 rank 20 / vector rank 30 still has a ratio of ~0.72 to the best result. Score-ratio cutoffs would almost never trigger with RRF. Instead, we measure <strong class="text-gray-200">relative gaps</strong>.
+            </p>
+            <p class="text-sm text-gray-400 mb-4">
+                <strong class="text-gray-200">The algorithm:</strong> After ranking by RRF, compute the gap between each consecutive pair. Track a running mean of gaps seen so far. If <code class="text-amber-400">gap_i &gt; gap_threshold_factor &times; mean_gap_so_far</code>, stop — cliff detected.
+            </p>
+
+            <!-- Worked example table -->
+            <div class="overflow-x-auto mb-4">
+                <table class="w-full text-xs">
+                    <thead>
+                        <tr class="text-gray-500 border-b border-border">
+                            <th class="text-left py-2 px-3">Rank</th>
+                            <th class="text-left py-2 px-3">RRF Score</th>
+                            <th class="text-left py-2 px-3">Gap</th>
+                            <th class="text-left py-2 px-3">Running Mean</th>
+                            <th class="text-left py-2 px-3">Gap / Mean</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-400 font-mono">
+                        <tr class="border-b border-border/50"><td class="py-1.5 px-3">1</td><td class="py-1.5 px-3">0.0328</td><td class="py-1.5 px-3 text-gray-600">—</td><td class="py-1.5 px-3 text-gray-600">—</td><td class="py-1.5 px-3 text-gray-600">—</td></tr>
+                        <tr class="border-b border-border/50"><td class="py-1.5 px-3">2</td><td class="py-1.5 px-3">0.0318</td><td class="py-1.5 px-3">0.0010</td><td class="py-1.5 px-3">0.0010</td><td class="py-1.5 px-3 text-green-400">1.0x ✓</td></tr>
+                        <tr class="border-b border-border/50"><td class="py-1.5 px-3">3</td><td class="py-1.5 px-3">0.0307</td><td class="py-1.5 px-3">0.0011</td><td class="py-1.5 px-3">0.00105</td><td class="py-1.5 px-3 text-green-400">1.0x ✓</td></tr>
+                        <tr class="border-b border-border/50"><td class="py-1.5 px-3">4</td><td class="py-1.5 px-3">0.0295</td><td class="py-1.5 px-3">0.0012</td><td class="py-1.5 px-3">0.0011</td><td class="py-1.5 px-3 text-green-400">1.1x ✓</td></tr>
+                        <tr class="border-b border-border/50"><td class="py-1.5 px-3">5</td><td class="py-1.5 px-3">0.0281</td><td class="py-1.5 px-3">0.0014</td><td class="py-1.5 px-3">0.00118</td><td class="py-1.5 px-3 text-green-400">1.2x ✓</td></tr>
+                        <tr class="border-b border-border/50"><td class="py-1.5 px-3">6</td><td class="py-1.5 px-3">0.0266</td><td class="py-1.5 px-3">0.0015</td><td class="py-1.5 px-3">0.00124</td><td class="py-1.5 px-3 text-green-400">1.2x ✓</td></tr>
+                        <tr class="bg-red-900/10"><td class="py-1.5 px-3">7</td><td class="py-1.5 px-3">0.0198</td><td class="py-1.5 px-3 text-red-400">0.0068</td><td class="py-1.5 px-3">0.00124</td><td class="py-1.5 px-3 text-red-400 font-bold">5.5x STOP</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-xs text-gray-500">
+                Returns 6 results instead of 10. Ranks 1–6 have gradually increasing but consistent gaps (~0.001), then rank 7 drops sharply — the cliff. This is interpretable: "stop when the next result is dramatically worse than the trend so far." The approach works with compressed RRF scores because it measures relative gaps, not absolute score levels.
+            </p>
+        </div>
+    </div>
+
+    <!-- Primitive 6: RRF -->
+    <div class="mb-10">
+        <div class="flex items-start gap-4 mb-4">
+            <span class="flex-shrink-0 w-10 h-10 rounded-full bg-indigo-900/50 flex items-center justify-center text-indigo-400 font-bold text-sm mt-1">6</span>
+            <div>
+                <h3 class="text-xl font-semibold text-white mb-1">Reciprocal Rank Fusion (RRF) for Hybrid Scoring</h3>
+                <p class="text-gray-400 text-sm">Combine keyword search and semantic search using ranks, not raw scores — no normalization needed.</p>
+            </div>
+        </div>
+        <div class="bg-card border border-border rounded-lg p-6 ml-14">
+            <p class="text-sm text-gray-400 mb-4">
+                The naive approach to hybrid search is to normalize BM25 scores (range 0–15) and cosine similarity scores (range 0–1) to the same scale and take a weighted average. This is fragile — the normalization depends on the query, the corpus size, and the score distributions. RRF sidesteps all of this by operating on <strong class="text-gray-200">ranks</strong> instead of scores.
+            </p>
+            <div class="bg-gray-900/60 rounded-lg p-4 font-mono text-sm text-indigo-400 mb-4 text-center">
+                rrf_score(doc) = 1/(k + rank<sub>bm25</sub>) + 1/(k + rank<sub>vector</sub>)
+            </div>
+            <div class="space-y-2 text-sm text-gray-400">
+                <p>Where <code class="text-indigo-400">k</code> is a constant (default 60, configurable as <code class="text-indigo-400">rrf_k</code>). Three advantages:</p>
+                <ul class="list-disc ml-5 space-y-1 text-xs">
+                    <li><strong class="text-gray-300">No normalization needed</strong> — operates on ranks, not raw scores</li>
+                    <li><strong class="text-gray-300">Scale-invariant</strong> — BM25 producing scores 0–15 and cosine producing 0–1 doesn't matter</li>
+                    <li><strong class="text-gray-300">Well-studied</strong> — used by Elasticsearch, Vespa, and many production RAG systems</li>
+                </ul>
+            </div>
+            <p class="text-xs text-gray-500 mt-3">
+                For keyword-only mode, only BM25 ranks are used. For vector-only, only cosine ranks. For hybrid, both contribute to the final score.
+            </p>
+        </div>
+    </div>
+
+    <!-- Primitive 7: Distraction Detection via Score Disagreement -->
+    <div class="mb-10">
+        <div class="flex items-start gap-4 mb-4">
+            <span class="flex-shrink-0 w-10 h-10 rounded-full bg-red-900/50 flex items-center justify-center text-red-400 font-bold text-sm mt-1">7</span>
+            <div>
+                <h3 class="text-xl font-semibold text-white mb-1">Distraction Detection via Score Disagreement</h3>
+                <p class="text-gray-400 text-sm">A result that ranks high in keywords but low in meaning (or vice versa) is suspicious — flag it.</p>
+            </div>
+        </div>
+        <div class="bg-card border border-border rounded-lg p-6 ml-14">
+            <p class="text-sm text-gray-400 mb-4">
+                Distractors share keywords with the query but mean something different. BM25 ranks them high (keyword overlap), but vector search ranks them low (different semantics). This <strong class="text-gray-200">disagreement between scoring methods</strong> is a detectable signal at query time — no golden labels needed.
+            </p>
+            <div class="bg-gray-900/60 rounded-lg p-4 font-mono text-sm text-red-400 mb-4 text-center">
+                disagreement = |rank<sub>bm25</sub> - rank<sub>vector</sub>| / max(rank<sub>bm25</sub>, rank<sub>vector</sub>)
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                <div class="bg-green-900/10 border border-green-900/20 rounded-lg p-3">
+                    <div class="text-xs font-semibold text-green-400 mb-1">Doc A: Consistent ranking</div>
+                    <div class="text-xs text-gray-400 font-mono">BM25 rank 2, vector rank 3</div>
+                    <div class="text-xs text-gray-400 font-mono">disagreement = 1/3 = <span class="text-green-400">0.33 (OK)</span></div>
+                </div>
+                <div class="bg-red-900/10 border border-red-900/20 rounded-lg p-3">
+                    <div class="text-xs font-semibold text-red-400 mb-1">Doc B: Classic keyword trap</div>
+                    <div class="text-xs text-gray-400 font-mono">BM25 rank 1, vector rank 12</div>
+                    <div class="text-xs text-gray-400 font-mono">disagreement = 11/12 = <span class="text-red-400">0.92 (FLAGGED)</span></div>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500">
+                Doc B matches on keywords but means something different — a classic FAQ distractor. The flag appears in query output so the agent can see it, but it does NOT auto-filter the result. The agent decides what to do. At evaluation time (not query time), golden labels provide exact distractor counts as ground truth.
+            </p>
+        </div>
+    </div>
+
+    <!-- Primitive 8: UDCG — the core metric -->
+    <div class="mb-10">
+        <div class="flex items-start gap-4 mb-4">
+            <span class="flex-shrink-0 w-10 h-10 rounded-full bg-amber-900/50 flex items-center justify-center text-amber-400 font-bold text-sm mt-1">8</span>
+            <div>
+                <h3 class="text-xl font-semibold text-white mb-1">UDCG: Utility-Discounted Cumulative Gain</h3>
+                <p class="text-gray-400 text-sm">The metric that makes distractors visible — traditional nDCG treats wrong answers as harmless zeros. UDCG assigns them -1.</p>
+            </div>
+        </div>
+        <div class="bg-card border border-border rounded-lg p-6 ml-14">
+            <div class="bg-gray-900/60 rounded-lg p-4 font-mono text-sm text-amber-400 mb-4 text-center">
+                UDCG@k = &Sigma;<sub>i=1</sub><sup>k</sup> utility(doc<sub>i</sub>) / log<sub>2</sub>(i + 1)
+            </div>
+            <div class="grid grid-cols-3 gap-3 mb-4 max-w-md">
+                <div class="bg-green-900/20 border border-green-900/30 rounded-lg p-3 text-center">
+                    <div class="text-lg font-bold text-green-400">+1</div>
+                    <div class="text-xs text-gray-400">Relevant</div>
+                </div>
+                <div class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-center">
+                    <div class="text-lg font-bold text-gray-500">0</div>
+                    <div class="text-xs text-gray-400">Irrelevant</div>
+                </div>
+                <div class="bg-red-900/20 border border-red-900/30 rounded-lg p-3 text-center">
+                    <div class="text-lg font-bold text-red-400">-1</div>
+                    <div class="text-xs text-gray-400">Distractor</div>
+                </div>
+            </div>
+            <p class="text-sm text-gray-400 mb-4">
+                Each result's contribution is weighted by its rank position — a distractor at rank 1 costs more than one at rank 5. The result is normalized by the ideal score (all relevant docs ranked first) to get nUDCG in the range [-1, +1].
+            </p>
+
+            <!-- Worked example -->
+            <div class="overflow-x-auto mb-4">
+                <p class="text-xs font-semibold text-gray-300 mb-2">Worked example — query with 3 relevant (R), 1 distractor (D), 1 irrelevant (I):</p>
+                <table class="w-full text-xs">
+                    <thead>
+                        <tr class="text-gray-500 border-b border-border">
+                            <th class="text-left py-2 px-3">Rank</th>
+                            <th class="text-left py-2 px-3">Doc</th>
+                            <th class="text-left py-2 px-3">Utility</th>
+                            <th class="text-left py-2 px-3">Discount</th>
+                            <th class="text-left py-2 px-3">Contribution</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-400 font-mono">
+                        <tr class="border-b border-border/50"><td class="py-1.5 px-3">1</td><td class="py-1.5 px-3 text-green-400">R</td><td class="py-1.5 px-3">+1.0</td><td class="py-1.5 px-3">1.000</td><td class="py-1.5 px-3 text-green-400">+1.000</td></tr>
+                        <tr class="border-b border-border/50 bg-red-900/10"><td class="py-1.5 px-3">2</td><td class="py-1.5 px-3 text-red-400">D</td><td class="py-1.5 px-3">-1.0</td><td class="py-1.5 px-3">0.631</td><td class="py-1.5 px-3 text-red-400">-0.631</td></tr>
+                        <tr class="border-b border-border/50"><td class="py-1.5 px-3">3</td><td class="py-1.5 px-3 text-green-400">R</td><td class="py-1.5 px-3">+1.0</td><td class="py-1.5 px-3">0.500</td><td class="py-1.5 px-3 text-green-400">+0.500</td></tr>
+                        <tr class="border-b border-border/50"><td class="py-1.5 px-3">4</td><td class="py-1.5 px-3 text-gray-600">I</td><td class="py-1.5 px-3">0.0</td><td class="py-1.5 px-3">0.431</td><td class="py-1.5 px-3 text-gray-600">0.000</td></tr>
+                        <tr><td class="py-1.5 px-3">5</td><td class="py-1.5 px-3 text-green-400">R</td><td class="py-1.5 px-3">+1.0</td><td class="py-1.5 px-3">0.387</td><td class="py-1.5 px-3 text-green-400">+0.387</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                <div class="bg-gray-900/50 rounded-lg p-3 text-center">
+                    <div class="text-xs text-gray-500 mb-1">UDCG@5</div>
+                    <div class="text-lg font-bold text-amber-400">1.256</div>
+                </div>
+                <div class="bg-gray-900/50 rounded-lg p-3 text-center">
+                    <div class="text-xs text-gray-500 mb-1">Ideal (3R at top)</div>
+                    <div class="text-lg font-bold text-gray-400">2.131</div>
+                </div>
+                <div class="bg-gray-900/50 rounded-lg p-3 text-center">
+                    <div class="text-xs text-gray-500 mb-1">nUDCG@5</div>
+                    <div class="text-lg font-bold text-amber-400">0.59</div>
+                </div>
+            </div>
+            <div class="bg-amber-900/15 border border-amber-900/30 rounded-lg p-3 mb-4">
+                <p class="text-xs text-amber-400">
+                    <strong>Key insight:</strong> The distractor at rank 2 cost 0.631 points. If we removed it and shifted results up, nUDCG would jump to ~0.85. This is what the agent discovers through the feedback loop — <strong>removing distractors is more valuable than finding more relevant documents.</strong>
+                </p>
+            </div>
+            <p class="text-xs text-gray-500">
+                <strong class="text-gray-400">Document-level dedup:</strong> Golden labels are per-document but retrieval returns per-chunk results. A document may produce multiple chunks. To avoid double-counting: for each document, only the highest-ranked chunk contributes to UDCG. All subsequent chunks from the same document are skipped (utility&nbsp;=&nbsp;0). This prevents distractor penalties from being inflated by multi-chunk documents.
+            </p>
+        </div>
+    </div>
+
+    <!-- Mutually Assured Distraction (MAD) — the insight that ties it all together -->
+    <div class="mb-10">
+        <div class="flex items-start gap-4 mb-4">
+            <span class="flex-shrink-0 w-10 h-10 rounded-full bg-rose-900/50 flex items-center justify-center text-rose-400 font-bold text-sm mt-1">!</span>
+            <div>
+                <h3 class="text-xl font-semibold text-white mb-1">Mutually Assured Distraction (MAD)</h3>
+                <p class="text-gray-400 text-sm">The foundational insight: a wrong result doesn't just waste a slot — it actively corrupts LLM reasoning.</p>
+            </div>
+        </div>
+        <div class="bg-card border border-border rounded-lg p-6 ml-14">
+            <p class="text-sm text-gray-400 mb-4">
+                Traditional search evaluation treats results as either relevant (1) or irrelevant (0). This made sense when humans scanned a list — an irrelevant result was just skipped. But when an LLM reads search results as context, a <strong class="text-gray-200">distractor</strong> (a result that looks right but is wrong) actively corrupts the answer. The LLM can't distinguish between "API authentication via bearer tokens" and "authentication FAQ about password resets" — both mention authentication, but one answers the wrong question.
+            </p>
+            <p class="text-sm text-gray-400 mb-4">
+                This is the MAD insight from Hornet: <strong class="text-gray-200">in LLM-powered retrieval, irrelevant is not the worst outcome — misleading is.</strong> An FAQ document about password resets doesn't just fail to help with an API auth question; it pulls the LLM's response toward password reset instructions, contaminating the final answer.
+            </p>
+            <p class="text-sm text-gray-400">
+                Every primitive in Hive exists to address this: UDCG makes the cost visible (-1 per distractor), score disagreement detects them at query time, dynamic-k prevents over-retrieving them, category filters exclude them structurally, and deploy gates prevent configs that increase them. The entire system is oriented around one question: <strong class="text-gray-200">"are we injecting harmful context into the LLM?"</strong>
+            </p>
+        </div>
+    </div>
+
+    <!-- Built from scratch — no external search infra -->
+    <div class="mb-4">
+        <div class="flex items-start gap-4 mb-4">
+            <span class="flex-shrink-0 w-10 h-10 rounded-full bg-cyan-900/50 flex items-center justify-center text-cyan-400 font-bold text-sm mt-1">0</span>
+            <div>
+                <h3 class="text-xl font-semibold text-white mb-1">Zero External Infrastructure</h3>
+                <p class="text-gray-400 text-sm">No Elasticsearch. No Pinecone. No Docker. BM25 from scratch, vector search with numpy, all in SQLite.</p>
+            </div>
+        </div>
+        <div class="bg-card border border-border rounded-lg p-6 ml-14">
+            <p class="text-sm text-gray-400 mb-4">
+                Hive implements the entire search engine from first principles: BM25 scoring with an inverted index (~100 lines), vector search via cosine similarity on numpy arrays, and RRF fusion — all stored in a single SQLite database. For the prototype's corpus of ~60 chunks, this runs in milliseconds with no external services.
+            </p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-gray-400">
+                <div class="bg-gray-900/50 rounded-lg p-3">
+                    <strong class="text-cyan-400">BM25</strong>: Inverted index in SQLite. Per-chunk term frequencies in <code>postings</code>, per-term doc frequencies in <code>term_stats</code>, corpus stats for length normalization. O(matching chunks) per query term.
+                </div>
+                <div class="bg-gray-900/50 rounded-lg p-3">
+                    <strong class="text-cyan-400">Vector search</strong>: Embeddings stored as numpy arrays serialized via <code>tobytes()</code> in SQLite BLOBs. Cosine similarity via <code>np.dot</code>. For 50–150 chunks, this is instant (&lt;5ms). No ANN index needed.
+                </div>
+                <div class="bg-gray-900/50 rounded-lg p-3">
+                    <strong class="text-cyan-400">Pre-filtering</strong>: Category filters applied as a WHERE clause on metadata before scoring. Distractors in excluded categories never enter the ranking pipeline.
+                </div>
+                <div class="bg-gray-900/50 rounded-lg p-3">
+                    <strong class="text-cyan-400">Embedding caching</strong>: Pre-computed embeddings saved to <code>.npz</code> files. Demo runs with cached embeddings — no OpenAI API calls during the recording. BM25-only mode available when no API key is set.
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
 <!-- Three-Level Verification -->
 <section class="px-6 py-20 max-w-5xl mx-auto">
     <h2 class="text-3xl font-bold text-white mb-4">Three-Level Verification</h2>

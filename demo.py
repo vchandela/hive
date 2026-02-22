@@ -20,7 +20,6 @@ from pathlib import Path
 
 from rich.console import Console
 from rich.panel import Panel
-from rich.syntax import Syntax
 
 console = Console()
 
@@ -69,7 +68,10 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "config_path": {"type": "string", "description": "Path to config JSON file"},
+                    "config_path": {
+                        "type": "string",
+                        "description": "Path to config JSON file",
+                    },
                 },
                 "required": ["config_path"],
             },
@@ -83,7 +85,10 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "config_path": {"type": "string", "description": "Path to config JSON file"},
+                    "config_path": {
+                        "type": "string",
+                        "description": "Path to config JSON file",
+                    },
                     "query": {"type": "string", "description": "Search query string"},
                 },
                 "required": ["config_path", "query"],
@@ -98,7 +103,10 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "config_path": {"type": "string", "description": "Path to config JSON file"},
+                    "config_path": {
+                        "type": "string",
+                        "description": "Path to config JSON file",
+                    },
                 },
                 "required": ["config_path"],
             },
@@ -112,8 +120,14 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "config_a": {"type": "string", "description": "Path to first config"},
-                    "config_b": {"type": "string", "description": "Path to second config"},
+                    "config_a": {
+                        "type": "string",
+                        "description": "Path to first config",
+                    },
+                    "config_b": {
+                        "type": "string",
+                        "description": "Path to second config",
+                    },
                 },
                 "required": ["config_a", "config_b"],
             },
@@ -127,7 +141,10 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "config_path": {"type": "string", "description": "Path to config to deploy"},
+                    "config_path": {
+                        "type": "string",
+                        "description": "Path to config to deploy",
+                    },
                 },
                 "required": ["config_path"],
             },
@@ -141,8 +158,14 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "File path to write (e.g., workspace/configs/v2.json)"},
-                    "content": {"type": "string", "description": "JSON string content of the config"},
+                    "path": {
+                        "type": "string",
+                        "description": "File path to write (e.g., workspace/configs/v2.json)",
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "JSON string content of the config",
+                    },
                 },
                 "required": ["path", "content"],
             },
@@ -185,7 +208,9 @@ def execute_tool(name: str, arguments: dict) -> str:
         if name == "hive_evaluate":
             return _run_hive(["evaluate", arguments["config_path"]])
         elif name == "hive_query":
-            return _run_hive(["query", arguments["config_path"], "--q", arguments["query"]])
+            return _run_hive(
+                ["query", arguments["config_path"], "--q", arguments["query"]]
+            )
         elif name == "hive_validate":
             return _run_hive(["validate", arguments["config_path"]])
         elif name == "hive_compare":
@@ -216,35 +241,47 @@ def run_demo():
     try:
         import openai
     except ImportError:
-        console.print("[red]Error: openai package is required. pip install openai[/red]")
+        console.print(
+            "[red]Error: openai package is required. pip install openai[/red]"
+        )
         return
 
     if not os.environ.get("OPENAI_API_KEY"):
-        console.print("[red]Error: OPENAI_API_KEY environment variable is required[/red]")
+        console.print(
+            "[red]Error: OPENAI_API_KEY environment variable is required[/red]"
+        )
         return
 
     # Pre-step: ensure index exists
     console.print(Panel("[bold blue]Pre-step: Indexing corpus...[/bold blue]"))
-    index_output = _run_hive([
-        "index", "workspace/collections/knowledge-base.json",
-        "--force", "--no-embeddings",
-    ])
+    index_output = _run_hive(
+        [
+            "index",
+            "workspace/collections/knowledge-base.json",
+            "--force",
+            "--no-embeddings",
+        ]
+    )
     console.print(index_output)
 
     # Initialize agent
     client = openai.OpenAI()
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-    console.print(Panel(
-        "[bold green]Starting Hive Optimization Agent[/bold green]\n"
-        f"Model: gpt-4o | Max iterations: {MAX_ITERATIONS}",
-        border_style="green",
-    ))
+    console.print(
+        Panel(
+            "[bold green]Starting Hive Optimization Agent[/bold green]\n"
+            f"Model: gpt-4o | Max iterations: {MAX_ITERATIONS}",
+            border_style="green",
+        )
+    )
 
     deployed = False
 
     for iteration in range(1, MAX_ITERATIONS + 1):
-        console.print(f"\n[bold]━━━ Iteration {iteration}/{MAX_ITERATIONS} ━━━[/bold]\n")
+        console.print(
+            f"\n[bold]━━━ Iteration {iteration}/{MAX_ITERATIONS} ━━━[/bold]\n"
+        )
 
         try:
             response = client.chat.completions.create(
@@ -270,31 +307,41 @@ def run_demo():
 
         # Display agent reasoning
         if msg.content:
-            console.print(Panel(msg.content, title="Agent Reasoning", border_style="cyan"))
+            console.print(
+                Panel(msg.content, title="Agent Reasoning", border_style="cyan")
+            )
 
         messages.append(msg)
 
         tool_calls = msg.tool_calls or []
 
         if not tool_calls:
-            console.print("[dim]Agent returned text only, no tool calls. Ending loop.[/dim]")
+            console.print(
+                "[dim]Agent returned text only, no tool calls. Ending loop.[/dim]"
+            )
             break
 
         for tc in tool_calls:
             fn_name = tc.function.name
             fn_args = json.loads(tc.function.arguments)
 
-            console.print(f"  [bold yellow]→ {fn_name}[/bold yellow]({json.dumps(fn_args, indent=2)[:200]})")
+            console.print(
+                f"  [bold yellow]→ {fn_name}[/bold yellow]({json.dumps(fn_args, indent=2)[:200]})"
+            )
 
             result = execute_tool(fn_name, fn_args)
 
-            console.print(Panel(result[:1500], title=f"Result: {fn_name}", border_style="dim"))
+            console.print(
+                Panel(result[:1500], title=f"Result: {fn_name}", border_style="dim")
+            )
 
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tc.id,
-                "content": result,
-            })
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "content": result,
+                }
+            )
 
         if any(tc.function.name == "hive_deploy" for tc in tool_calls):
             deployed = True
@@ -303,20 +350,24 @@ def run_demo():
     # Summary
     console.print("\n")
     if deployed:
-        console.print(Panel(
-            "[bold green]Demo complete![/bold green]\n"
-            "The agent successfully optimized the retrieval config through\n"
-            "the evaluate → reason → improve → deploy feedback loop.",
-            border_style="green",
-            title="Summary",
-        ))
+        console.print(
+            Panel(
+                "[bold green]Demo complete![/bold green]\n"
+                "The agent successfully optimized the retrieval config through\n"
+                "the evaluate → reason → improve → deploy feedback loop.",
+                border_style="green",
+                title="Summary",
+            )
+        )
     else:
-        console.print(Panel(
-            f"[bold yellow]Demo ended after {MAX_ITERATIONS} iterations without deploying.[/bold yellow]\n"
-            "The agent may need more iterations or manual guidance.",
-            border_style="yellow",
-            title="Summary",
-        ))
+        console.print(
+            Panel(
+                f"[bold yellow]Demo ended after {MAX_ITERATIONS} iterations without deploying.[/bold yellow]\n"
+                "The agent may need more iterations or manual guidance.",
+                border_style="yellow",
+                title="Summary",
+            )
+        )
 
 
 if __name__ == "__main__":

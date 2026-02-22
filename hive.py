@@ -35,6 +35,7 @@ def _get_store() -> HiveStore:
 
 # ── validate ────────────────────────────────────────────────────────
 
+
 @app.command()
 def validate(config_path: str = typer.Argument(..., help="Path to config JSON")):
     """Check a retrieval config for syntactic and semantic errors."""
@@ -43,9 +44,13 @@ def validate(config_path: str = typer.Argument(..., help="Path to config JSON"))
     store.close()
 
     if passed:
-        console.print(Panel("[bold green]✓ Validation passed[/bold green]", border_style="green"))
+        console.print(
+            Panel("[bold green]✓ Validation passed[/bold green]", border_style="green")
+        )
     else:
-        console.print(Panel("[bold red]✗ Validation failed[/bold red]", border_style="red"))
+        console.print(
+            Panel("[bold red]✗ Validation failed[/bold red]", border_style="red")
+        )
         for err in errors:
             console.print(f"  [red]✗[/red] {err}")
         raise typer.Exit(code=1)
@@ -53,12 +58,17 @@ def validate(config_path: str = typer.Argument(..., help="Path to config JSON"))
 
 # ── index ───────────────────────────────────────────────────────────
 
+
 @app.command()
 def index(
     collection_path: str = typer.Argument(..., help="Path to collection JSON"),
     force: bool = typer.Option(False, "--force", help="Clear and rebuild index"),
-    embeddings_cache: str | None = typer.Option(None, "--embeddings-cache", help="Path to .npz cache file"),
-    no_embeddings: bool = typer.Option(False, "--no-embeddings", help="Skip embedding generation"),
+    embeddings_cache: str | None = typer.Option(
+        None, "--embeddings-cache", help="Path to .npz cache file"
+    ),
+    no_embeddings: bool = typer.Option(
+        False, "--no-embeddings", help="Skip embedding generation"
+    ),
 ):
     """Index documents from a collection into the search engine."""
     store = _get_store()
@@ -84,9 +94,12 @@ def index(
 
 # ── query ───────────────────────────────────────────────────────────
 
+
 @app.command()
 def query(
-    config_path: str = typer.Argument(None, help="Path to config JSON (default: active config)"),
+    config_path: str = typer.Argument(
+        None, help="Path to config JSON (default: active config)"
+    ),
     q: str = typer.Option("", "--q", help="Search query string"),
 ):
     """Run a search query and display ranked results."""
@@ -100,7 +113,9 @@ def query(
         if os.path.exists(active_path):
             config_path = active_path
         else:
-            console.print("[red]Error: no config specified and no active config found[/red]")
+            console.print(
+                "[red]Error: no config specified and no active config found[/red]"
+            )
             raise typer.Exit(code=1)
 
     config = json.loads(Path(config_path).read_text())
@@ -109,8 +124,10 @@ def query(
     store.close()
 
     # Format output
-    console.print(f"\n[bold]Query:[/bold] \"{q}\"")
-    console.print(f"[bold]Config:[/bold] {config['name']} | Method: {config['retrieval']['method']} | Top-k: {config['retrieval']['top_k']}")
+    console.print(f'\n[bold]Query:[/bold] "{q}"')
+    console.print(
+        f"[bold]Config:[/bold] {config['name']} | Method: {config['retrieval']['method']} | Top-k: {config['retrieval']['top_k']}"
+    )
     console.print()
 
     table = Table()
@@ -121,7 +138,9 @@ def query(
     table.add_column("Flagged", width=10)
 
     for i, r in enumerate(results, 1):
-        flag_str = f"[red]⚠ {r.disagreement:.2f}[/red]" if r.flagged and r.disagreement else ""
+        flag_str = (
+            f"[red]⚠ {r.disagreement:.2f}[/red]" if r.flagged and r.disagreement else ""
+        )
         table.add_row(
             str(i),
             f"{r.score:.4f}",
@@ -136,15 +155,20 @@ def query(
     dk_status = "on" if config.get("dynamic_k", {}).get("enabled") else "off"
     console.print(f"\n{len(results)} results returned (dynamic-k: {dk_status})")
     if flagged_count:
-        console.print(f"[yellow]{flagged_count} result(s) flagged as potential distractor(s)[/yellow]")
+        console.print(
+            f"[yellow]{flagged_count} result(s) flagged as potential distractor(s)[/yellow]"
+        )
 
 
 # ── evaluate ────────────────────────────────────────────────────────
 
+
 @app.command()
 def evaluate(
     config_path: str = typer.Argument(..., help="Path to config JSON"),
-    golden: str = typer.Option(DEFAULT_GOLDEN, "--golden", help="Path to golden eval set"),
+    golden: str = typer.Option(
+        DEFAULT_GOLDEN, "--golden", help="Path to golden eval set"
+    ),
 ):
     """Score a config against the golden evaluation set."""
     store = _get_store()
@@ -162,7 +186,9 @@ def evaluate(
     table.add_column("Distractors", justify="right", width=12)
 
     for pq in result["per_query"]:
-        nudcg_color = "green" if pq["nudcg"] > 0.5 else "yellow" if pq["nudcg"] > 0 else "red"
+        nudcg_color = (
+            "green" if pq["nudcg"] > 0.5 else "yellow" if pq["nudcg"] > 0 else "red"
+        )
         dist_color = "green" if pq["distractor_count"] == 0 else "red"
         table.add_row(
             pq["query"],
@@ -174,7 +200,9 @@ def evaluate(
     console.print(table)
 
     agg = result["aggregate"]
-    nudcg_color = "green" if agg["nudcg"] > 0.5 else "yellow" if agg["nudcg"] > 0 else "red"
+    nudcg_color = (
+        "green" if agg["nudcg"] > 0.5 else "yellow" if agg["nudcg"] > 0 else "red"
+    )
     console.print(
         Panel(
             f"[bold]Mean nUDCG:[/bold] [{nudcg_color}]{agg['nudcg']:.4f}[/{nudcg_color}]  |  "
@@ -188,11 +216,14 @@ def evaluate(
 
 # ── compare ─────────────────────────────────────────────────────────
 
+
 @app.command()
 def compare(
     config_a: str = typer.Argument(..., help="Path to first config"),
     config_b: str = typer.Argument(..., help="Path to second config"),
-    golden: str = typer.Option(DEFAULT_GOLDEN, "--golden", help="Path to golden eval set"),
+    golden: str = typer.Option(
+        DEFAULT_GOLDEN, "--golden", help="Path to golden eval set"
+    ),
 ):
     """Compare two configs side by side on the golden eval set."""
     store = _get_store()
@@ -246,10 +277,13 @@ def compare(
 
 # ── deploy ──────────────────────────────────────────────────────────
 
+
 @app.command()
 def deploy(
     config_path: str = typer.Argument(..., help="Path to config to deploy"),
-    golden: str = typer.Option(DEFAULT_GOLDEN, "--golden", help="Path to golden eval set"),
+    golden: str = typer.Option(
+        DEFAULT_GOLDEN, "--golden", help="Path to golden eval set"
+    ),
 ):
     """Deploy a config as the active config (refuses if nUDCG regresses)."""
     store = _get_store()
@@ -260,7 +294,9 @@ def deploy(
     candidate_nudcg = candidate_eval["aggregate"]["nudcg"]
 
     candidate_config = json.loads(Path(config_path).read_text())
-    console.print(f"\n[bold]Candidate:[/bold] {candidate_config['name']} | nUDCG: {candidate_nudcg:.4f}")
+    console.print(
+        f"\n[bold]Candidate:[/bold] {candidate_config['name']} | nUDCG: {candidate_nudcg:.4f}"
+    )
 
     # Check active config
     active_path = os.path.join(WORKSPACE, "configs", "active.json")
@@ -271,7 +307,9 @@ def deploy(
             active_eval = evaluate_config(active_path, golden, store)
         active_nudcg = active_eval["aggregate"]["nudcg"]
         active_config = json.loads(Path(active_path).read_text())
-        console.print(f"[bold]Active:[/bold] {active_config['name']} | nUDCG: {active_nudcg:.4f}")
+        console.print(
+            f"[bold]Active:[/bold] {active_config['name']} | nUDCG: {active_nudcg:.4f}"
+        )
 
         if candidate_nudcg < active_nudcg:
             console.print(
@@ -306,7 +344,11 @@ def deploy(
     improvement = ""
     if active_nudcg is not None:
         delta = candidate_nudcg - active_nudcg
-        improvement = f"  |  Delta: [green]+{delta:.4f}[/green]" if delta > 0 else f"  |  Delta: {delta:.4f}"
+        improvement = (
+            f"  |  Delta: [green]+{delta:.4f}[/green]"
+            if delta > 0
+            else f"  |  Delta: {delta:.4f}"
+        )
 
     console.print(
         Panel(

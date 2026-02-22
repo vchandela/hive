@@ -17,6 +17,7 @@ VALID_METHODS = {"keyword", "vector", "hybrid"}
 
 # ── Syntactic Validation ────────────────────────────────────────────
 
+
 def validate_syntactic(config: dict) -> list[str]:
     """Check required fields and types.  Returns list of error strings."""
     errors: list[str] = []
@@ -35,7 +36,9 @@ def validate_syntactic(config: dict) -> list[str]:
 
     method = retrieval.get("method")
     if method not in VALID_METHODS:
-        errors.append(f"'retrieval.method' must be one of {sorted(VALID_METHODS)}, got '{method}'.")
+        errors.append(
+            f"'retrieval.method' must be one of {sorted(VALID_METHODS)}, got '{method}'."
+        )
 
     top_k = retrieval.get("top_k")
     if not isinstance(top_k, int) or top_k < 1:
@@ -72,12 +75,15 @@ def validate_syntactic(config: dict) -> list[str]:
             errors.append("'distraction_detection.enabled' must be a boolean.")
         dt = dd.get("disagreement_threshold")
         if dt is not None and (not isinstance(dt, (int, float)) or dt < 0 or dt > 1):
-            errors.append("'distraction_detection.disagreement_threshold' must be a float between 0 and 1.")
+            errors.append(
+                "'distraction_detection.disagreement_threshold' must be a float between 0 and 1."
+            )
 
     return errors
 
 
 # ── Semantic Validation ─────────────────────────────────────────────
+
 
 def validate_semantic(
     config: dict,
@@ -122,6 +128,7 @@ def validate_semantic(
 
 
 # ── Top-level validate ──────────────────────────────────────────────
+
 
 def validate_config(
     config_path: str,

@@ -12,18 +12,24 @@ from pathlib import Path
 
 import numpy as np
 
-from core.embeddings import generate_embeddings, load_embeddings_cache, save_embeddings_cache
+from core.embeddings import (
+    generate_embeddings,
+    load_embeddings_cache,
+    save_embeddings_cache,
+)
 from core.store import HiveStore
 from core.text import tokenize
 
-
 # ── Chunking ────────────────────────────────────────────────────────
+
 
 def _slugify(heading: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", heading.lower()).strip("-")
 
 
-def chunk_markdown(doc_path: str, documents_dir: str, heading_level: int = 2) -> list[dict]:
+def chunk_markdown(
+    doc_path: str, documents_dir: str, heading_level: int = 2
+) -> list[dict]:
     """Split a markdown file into chunks at H2 boundaries."""
     path = Path(doc_path)
     text = path.read_text(encoding="utf-8")
@@ -76,6 +82,7 @@ def chunk_markdown(doc_path: str, documents_dir: str, heading_level: int = 2) ->
 
 # ── BM25 Index Building ────────────────────────────────────────────
 
+
 def build_postings(
     chunks: list[dict],
 ) -> tuple[list[tuple], list[tuple], tuple[int, float]]:
@@ -111,6 +118,7 @@ def build_postings(
 
 # ── Embedding helpers ───────────────────────────────────────────────
 
+
 def _serialize_embedding(emb: np.ndarray) -> bytes:
     return struct.pack(f"{len(emb)}f", *emb.tolist())
 
@@ -120,6 +128,7 @@ def _deserialize_embedding(data: bytes, dim: int = 1536) -> np.ndarray:
 
 
 # ── Main entry point ───────────────────────────────────────────────
+
 
 def index_collection(
     collection_path: str,

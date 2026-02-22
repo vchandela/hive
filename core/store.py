@@ -7,9 +7,7 @@ is small enough that async adds no value.
 
 from __future__ import annotations
 
-import json
 import sqlite3
-from pathlib import Path
 
 DEFAULT_DB_PATH = "hive.db"
 
@@ -85,7 +83,9 @@ class HiveStore:
             clauses, params = [], []
             for key, values in filters.items():
                 placeholders = ",".join("?" for _ in values)
-                clauses.append(f"json_extract(metadata_json, '$.{key}') IN ({placeholders})")
+                clauses.append(
+                    f"json_extract(metadata_json, '$.{key}') IN ({placeholders})"
+                )
                 params.extend(values)
             sql = "SELECT * FROM chunks WHERE " + " AND ".join(clauses)
             rows = self.conn.execute(sql, params).fetchall()
@@ -94,7 +94,9 @@ class HiveStore:
         return [dict(r) for r in rows]
 
     def get_chunk_by_id(self, chunk_id: str) -> dict | None:
-        row = self.conn.execute("SELECT * FROM chunks WHERE id = ?", (chunk_id,)).fetchone()
+        row = self.conn.execute(
+            "SELECT * FROM chunks WHERE id = ?", (chunk_id,)
+        ).fetchone()
         return dict(row) if row else None
 
     def delete_all_chunks(self) -> None:
@@ -110,7 +112,9 @@ class HiveStore:
         )
         self.conn.commit()
 
-    def get_postings_for_terms(self, terms: list[str]) -> dict[str, list[tuple[str, float]]]:
+    def get_postings_for_terms(
+        self, terms: list[str]
+    ) -> dict[str, list[tuple[str, float]]]:
         if not terms:
             return {}
         placeholders = ",".join("?" for _ in terms)
@@ -161,7 +165,9 @@ class HiveStore:
         self.conn.commit()
 
     def get_corpus_stats(self) -> tuple[int, float]:
-        row = self.conn.execute("SELECT total_chunks, avg_chunk_length FROM corpus_stats WHERE id = 1").fetchone()
+        row = self.conn.execute(
+            "SELECT total_chunks, avg_chunk_length FROM corpus_stats WHERE id = 1"
+        ).fetchone()
         if row is None:
             return (0, 0.0)
         return (row["total_chunks"], row["avg_chunk_length"])
@@ -192,7 +198,9 @@ class HiveStore:
 
     # ── Eval Results ───────────────────────────────────────────────
 
-    def insert_eval_result(self, config_name: str, query: str, metrics_json: str) -> None:
+    def insert_eval_result(
+        self, config_name: str, query: str, metrics_json: str
+    ) -> None:
         self.conn.execute(
             "INSERT INTO eval_results (config_name, query, metrics_json) VALUES (?, ?, ?)",
             (config_name, query, metrics_json),

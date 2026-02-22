@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import math
 import struct
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -41,7 +41,9 @@ class SearchResult:
             "bm25_rank": self.bm25_rank,
             "vector_rank": self.vector_rank,
             "flagged": self.flagged,
-            "disagreement": round(self.disagreement, 4) if self.disagreement is not None else None,
+            "disagreement": (
+                round(self.disagreement, 4) if self.disagreement is not None else None
+            ),
         }
 
 
@@ -92,6 +94,7 @@ def bm25_search(
 
 # ── Vector Search ───────────────────────────────────────────────────
 
+
 def _deserialize_embedding(data: bytes, dim: int = 1536) -> np.ndarray:
     return np.array(struct.unpack(f"{dim}f", data), dtype=np.float32)
 
@@ -137,6 +140,7 @@ def vector_search(
 
 # ── Reciprocal Rank Fusion ──────────────────────────────────────────
 
+
 def rrf_fuse(
     bm25_results: list[tuple[str, float]],
     vector_results: list[tuple[str, float]],
@@ -165,6 +169,7 @@ def rrf_fuse(
 
 # ── Dynamic-k (gap-based cliff detection) ──────────────────────────
 
+
 def apply_dynamic_k(
     results: list,
     gap_threshold_factor: float,
@@ -187,13 +192,18 @@ def apply_dynamic_k(
         gap_count += 1
         running_mean = gap_sum / gap_count
 
-        if i >= min_results and running_mean > 0 and gap > gap_threshold_factor * running_mean:
+        if (
+            i >= min_results
+            and running_mean > 0
+            and gap > gap_threshold_factor * running_mean
+        ):
             return results[:i]
 
     return results
 
 
 # ── Distraction Flagging ────────────────────────────────────────────
+
 
 def flag_distractors(
     results: list[SearchResult],
@@ -210,6 +220,7 @@ def flag_distractors(
 
 
 # ── Top-level search orchestrator ───────────────────────────────────
+
 
 def search(query: str, config: dict, store: HiveStore) -> list[SearchResult]:
     """Run the full search pipeline for a query + config."""
@@ -243,15 +254,27 @@ def search(query: str, config: dict, store: HiveStore) -> list[SearchResult]:
     if method == "hybrid" and bm25_results and vector_results:
         fused = rrf_fuse(bm25_results, vector_results, rrf_k)
     elif method == "keyword":
-        fused = [(cid, 1.0 / (rrf_k + rank + 1), rank + 1, 0) for rank, (cid, _) in enumerate(bm25_results)]
+        fused = [
+            (cid, 1.0 / (rrf_k + rank + 1), rank + 1, 0)
+            for rank, (cid, _) in enumerate(bm25_results)
+        ]
     elif method == "vector":
-        fused = [(cid, 1.0 / (rrf_k + rank + 1), 0, rank + 1) for rank, (cid, _) in enumerate(vector_results)]
+        fused = [
+            (cid, 1.0 / (rrf_k + rank + 1), 0, rank + 1)
+            for rank, (cid, _) in enumerate(vector_results)
+        ]
     else:
         # Fallback: whichever has results
         if bm25_results:
-            fused = [(cid, 1.0 / (rrf_k + rank + 1), rank + 1, 0) for rank, (cid, _) in enumerate(bm25_results)]
+            fused = [
+                (cid, 1.0 / (rrf_k + rank + 1), rank + 1, 0)
+                for rank, (cid, _) in enumerate(bm25_results)
+            ]
         elif vector_results:
-            fused = [(cid, 1.0 / (rrf_k + rank + 1), 0, rank + 1) for rank, (cid, _) in enumerate(vector_results)]
+            fused = [
+                (cid, 1.0 / (rrf_k + rank + 1), 0, rank + 1)
+                for rank, (cid, _) in enumerate(vector_results)
+            ]
         else:
             fused = []
 

@@ -134,14 +134,16 @@ def compare_configs(
 
     deltas: list[dict] = []
     for qa, qb in zip(eval_a["per_query"], eval_b["per_query"]):
-        deltas.append({
-            "query": qa["query"],
-            "nudcg_a": qa["nudcg"],
-            "nudcg_b": qb["nudcg"],
-            "delta": round(qb["nudcg"] - qa["nudcg"], 4),
-            "distractors_a": qa["distractor_count"],
-            "distractors_b": qb["distractor_count"],
-        })
+        deltas.append(
+            {
+                "query": qa["query"],
+                "nudcg_a": qa["nudcg"],
+                "nudcg_b": qb["nudcg"],
+                "delta": round(qb["nudcg"] - qa["nudcg"], 4),
+                "distractors_a": qa["distractor_count"],
+                "distractors_b": qb["distractor_count"],
+            }
+        )
 
     # Config diff: find fields that differ
     config_a = json.loads(Path(config_a_path).read_text())
@@ -154,8 +156,11 @@ def compare_configs(
         "deltas": deltas,
         "config_diff": config_diff,
         "aggregate_delta": {
-            "nudcg": round(eval_b["aggregate"]["nudcg"] - eval_a["aggregate"]["nudcg"], 4),
-            "distractors": eval_b["aggregate"]["total_distractors"] - eval_a["aggregate"]["total_distractors"],
+            "nudcg": round(
+                eval_b["aggregate"]["nudcg"] - eval_a["aggregate"]["nudcg"], 4
+            ),
+            "distractors": eval_b["aggregate"]["total_distractors"]
+            - eval_a["aggregate"]["total_distractors"],
         },
     }
 
