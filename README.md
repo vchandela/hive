@@ -2,7 +2,7 @@
 
 Hive is a self-contained, CLI-first retrieval engine that demonstrates closed-loop feedback for search quality. An LLM agent starts with a naive retrieval config, detects poor results through utility-based metrics (UDCG), iteratively improves the config, and deploys a measurably better version — all without human intervention.
 
-**[Open the interactive explainer](docs/explainer.html)** for a visual walkthrough.
+**[Open the interactive explainer](https://vchandela.github.io/hive/docs/explainer.html)** for a visual walkthrough.
 
 ## Why Hive?
 
