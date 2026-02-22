@@ -1,0 +1,29 @@
+{
+  "queries": [
+    {
+      "query": "How do I authenticate API requests?",
+      "relevant": ["api-docs/authentication.md"],
+      "distractors": ["faqs/authentication-faq.md"]
+    },
+    {
+      "query": "What is the rate limit for the query endpoint?",
+      "relevant": ["api-docs/rate-limits.md", "api-docs/query-api.md"],
+      "distractors": ["faqs/query-faq.md"]
+    },
+    {
+      "query": "How do I set up webhooks?",
+      "relevant": ["api-docs/webhooks.md"],
+      "distractors": ["faqs/webhook-faq.md"]
+    },
+    {
+      "query": "What SDK languages are supported?",
+      "relevant": ["api-docs/sdks.md"],
+      "distractors": ["faqs/sdk-faq.md"]
+    },
+    {
+      "query": "How do I import data from CSV?",
+      "relevant": ["tutorials/data-import.md"],
+      "distractors": []
+    }
+  ]
+}

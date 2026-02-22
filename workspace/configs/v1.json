@@ -1,0 +1,20 @@
+{
+  "name": "v1-naive",
+  "collection": "knowledge-base",
+  "retrieval": {
+    "method": "hybrid",
+    "top_k": 10,
+    "rrf_k": 60
+  },
+  "dynamic_k": {
+    "enabled": false,
+    "gap_threshold_factor": 3.0,
+    "min_results": 1,
+    "max_results": 10
+  },
+  "filters": {},
+  "distraction_detection": {
+    "enabled": false,
+    "disagreement_threshold": 0.7
+  }
+}
