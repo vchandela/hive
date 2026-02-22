@@ -101,9 +101,10 @@ def vector_search(
     store: HiveStore,
     allowed_ids: set[str] | None = None,
 ) -> list[tuple[str, float]]:
-    """Score chunks by cosine similarity to query embedding."""
-    query_emb = generate_embeddings([query_text])[0]
+    """Score chunks by cosine similarity to query embedding.
 
+    Returns empty list if no embeddings are stored (indexed with --no-embeddings).
+    """
     all_chunks = store.get_all_chunks()
     ids: list[str] = []
     embeddings: list[np.ndarray] = []
@@ -118,6 +119,8 @@ def vector_search(
 
     if not embeddings:
         return []
+
+    query_emb = generate_embeddings([query_text])[0]
 
     emb_matrix = np.array(embeddings, dtype=np.float32)
     query_norm = np.linalg.norm(query_emb)
